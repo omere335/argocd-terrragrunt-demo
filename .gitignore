@@ -42,3 +42,18 @@ terraform.rc
 # Optional: ignore plan files saved before destroying Terraform configuration
 # Uncomment the line below if you want to ignore planout files.
 # planout
+
+# Terragrunt
+.terragrunt-cache/
+
+# Local Terraform state written by root.hcl (demo only - see README)
+.terragrunt-state/
+
+# Locally downloaded tooling - never commit binaries
+/kubectl
+
+# Claude Code per-machine settings
+.claude/settings.local.json
+
+# helm package output
+*.tgz
