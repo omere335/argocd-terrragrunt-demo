@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: hello-app
+  namespace: argocd
+spec:
+  description: Hello World demo application. Scoped to a single repo and namespace.
+
+  # If you forked this repo, this URL and the two in application.yaml must match
+  # your fork, or ArgoCD will refuse the source.
+  sourceRepos:
+    - https://github.com/omere335/argocd-terrragrunt-demo.git
+
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: hello-app
+
+  clusterResourceWhitelist: []
+
+  namespaceResourceWhitelist:
+    - group: apps
+      kind: Deployment
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ServiceAccount
+    - group: policy
+      kind: PodDisruptionBudget
+    - group: networking.k8s.io
+      kind: NetworkPolicy

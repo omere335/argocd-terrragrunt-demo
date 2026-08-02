@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: hello-app
+  namespace: argocd
+  finalizers:
+    # Makes `kubectl delete application hello-app` also remove the deployed
+    # resources, instead of orphaning them.
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: hello-app
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: hello-app
+
+  sources:
+    - repoURL: https://github.com/omere335/argocd-terrragrunt-demo.git
+      targetRevision: main
+      ref: values
+
+    - repoURL: https://github.com/omere335/argocd-terrragrunt-demo.git
+      targetRevision: main
+      path: charts/hello-app
+      helm:
+        releaseName: hello-app
+        valueFiles:
+          - $values/envs/dev/app/values.generated.yaml
+
+  syncPolicy:
+    automated:
+      # Remove resources that are deleted from Git, rather than leaving them
+      # running with no definition anywhere.
+      prune: true
+      selfHeal: true
+
+    syncOptions:
+      - ServerSideApply=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
