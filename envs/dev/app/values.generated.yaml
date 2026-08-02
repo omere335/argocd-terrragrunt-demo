@@ -1,0 +1,24 @@
+# GENERATED FILE - DO NOT EDIT BY HAND.
+#
+# Rendered by the Terraform module in modules/app and committed to Git.
+# ArgoCD reads this file - Terraform never talks to the cluster.
+#
+# To change it: edit the inputs in envs/<env>/app/terragrunt.hcl, run
+# `terragrunt apply`, then commit the result. The commit is the audit trail.
+"app":
+  "port": 8080
+  "text": "Hello World"
+"fullnameOverride": "hello-app"
+"image":
+  "reference": "hashicorp/http-echo:1.0@sha256:fcb75f691c8b0414d670ae570240cbf95502cc18a9ba57e982ecac589760a186"
+"networkPolicy":
+  "enabled": true
+"replicaCount": 2
+"resources":
+  "limits":
+    "memory": "64Mi"
+  "requests":
+    "cpu": "10m"
+    "memory": "64Mi"
+"service":
+  "port": 80
