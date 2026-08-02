@@ -1,0 +1,131 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Least privilege by default. No job here needs to write to the repo, publish a
+# package, or mint an OIDC token.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Every tool version is pinned. CI that silently follows "latest" is CI that
+  # can break, or change behaviour, without anyone changing a line of code.
+  TERRAFORM_VERSION: "1.9.8"
+  TERRAGRUNT_VERSION: "0.77.22"
+  HELM_VERSION: "3.16.3"
+  KUBECONFORM_VERSION: "0.6.7"
+  ACTIONLINT_VERSION: "1.7.7"
+  # Must match the Kubernetes version scripts/bootstrap.sh installs, or CI
+  # validates against a different API surface than the one being deployed to.
+  K8S_VERSION: "1.34.10"
+
+jobs:
+  terraform:
+    name: Terraform / Terragrunt
+    runs-on: ubuntu-24.04
+    steps:
+      # Only third-party action in this workflow, pinned to a commit SHA (not a
+      # tag, which can be repointed) - everything else is an explicit, pinned download.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Terraform and Terragrunt
+        run: |
+          set -euo pipefail
+          curl -fsSL -o tf.zip \
+            "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+          unzip -q tf.zip -d /usr/local/bin
+          curl -fsSL -o /usr/local/bin/terragrunt \
+            "https://github.com/gruntwork-io/terragrunt/releases/download/v${TERRAGRUNT_VERSION}/terragrunt_linux_amd64"
+          chmod +x /usr/local/bin/terragrunt
+          terraform version
+          terragrunt --version
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive -diff
+
+      - name: terragrunt hclfmt
+        # The subcommand was renamed in Terragrunt 0.78 (hclfmt -> hcl fmt);
+        # scripts/terragrunt-fmt.sh probes for the right one so this step,
+        # `make fmt`, and `make lint` all share one implementation instead of
+        # three copies that can disagree.
+        run: ./scripts/terragrunt-fmt.sh --check --diff
+
+      - name: terraform validate
+        working-directory: modules/app
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+
+  helm:
+    name: Helm / kubeconform
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Helm and kubeconform
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz" \
+            | tar -xz -C /tmp linux-amd64/helm
+          install -m 0755 /tmp/linux-amd64/helm /usr/local/bin/helm
+          kubeconform_url="https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
+          curl -fsSL "$kubeconform_url" | tar -xz -C /tmp kubeconform
+          install -m 0755 /tmp/kubeconform /usr/local/bin/kubeconform
+
+      # Also exercises charts/hello-app/values.schema.json against the
+      # Terraform-generated values, so a bad values file fails here rather than
+      # in the cluster.
+      - name: helm lint
+        run: helm lint charts/hello-app --values envs/dev/app/values.generated.yaml
+
+      - name: helm template
+        run: |
+          helm template hello-app charts/hello-app \
+            --namespace hello-app \
+            --values envs/dev/app/values.generated.yaml \
+            > /tmp/rendered.yaml
+          cat /tmp/rendered.yaml
+
+      # Strict schemas reject unknown fields, which is what catches a typo'd key
+      # that Kubernetes would otherwise accept and silently ignore.
+      - name: kubeconform
+        run: |
+          schema_location="https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/v"
+          schema_location="${schema_location}{{ .NormalizedKubernetesVersion }}"
+          schema_location="${schema_location}-standalone-strict/{{ .ResourceKind }}{{ .KindSuffix }}.json"
+          kubeconform -strict -summary \
+            -kubernetes-version "${K8S_VERSION}" \
+            -schema-location default \
+            -schema-location "$schema_location" \
+            /tmp/rendered.yaml
+
+  lint:
+    name: YAML / workflow lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: yamllint
+        run: |
+          pip install --quiet yamllint==1.35.1
+          yamllint -c .yamllint.yaml \
+            argocd/ \
+            charts/hello-app/values.yaml \
+            charts/hello-app/Chart.yaml \
+            .github/workflows/
+
+      - name: actionlint
+        run: |
+          set -euo pipefail
+          actionlint_url="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL "$actionlint_url" | tar -xz -C /tmp actionlint
+          install -m 0755 /tmp/actionlint /usr/local/bin/actionlint
+          actionlint
