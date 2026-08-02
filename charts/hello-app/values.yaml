@@ -1,0 +1,82 @@
+# Defaults for hello-app.
+#
+# Environment-specific values are NOT edited here. They are rendered by the
+# Terraform module in modules/app and committed as
+# envs/<env>/app/values.generated.yaml, which ArgoCD layers on top of this file.
+
+nameOverride: ""
+fullnameOverride: ""
+
+replicaCount: 2
+
+image:
+  # Deliberately empty. The digest-pinned reference is supplied by the
+  # Terraform-generated overlay (envs/<env>/app/values.generated.yaml) and lives
+  # ONLY there - a default here would be a second copy that drifts when the env
+  # bumps the digest. values.schema.json rejects an empty reference on purpose,
+  # so rendering the chart without the overlay fails loudly instead of deploying
+  # a stale image.
+  reference: ""
+  pullPolicy: IfNotPresent
+
+app:
+  # Served at "/" by http-echo. "/health" always returns {"status":"ok"}.
+  text: "Hello World"
+  port: 8080
+
+service:
+  type: ClusterIP
+  port: 80
+
+# See README "Resource requests and limits" for the reasoning behind the
+# asymmetry here: a memory limit but deliberately no CPU limit.
+resources:
+  requests:
+    cpu: 10m
+    memory: 64Mi
+  limits:
+    memory: 64Mi
+
+serviceAccount:
+  create: true
+  name: ""
+  # The app makes no calls to the Kubernetes API, so it is given no credentials
+  # for one. This is set on both the ServiceAccount and the pod spec.
+  automountServiceAccountToken: false
+
+# Three probes, three different jobs. See README "Probes".
+probes:
+  startup:
+    enabled: true
+    periodSeconds: 2
+    failureThreshold: 15
+  readiness:
+    enabled: true
+    periodSeconds: 5
+    timeoutSeconds: 2
+    failureThreshold: 2
+  liveness:
+    enabled: true
+    periodSeconds: 20
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true
+  # Namespace running the cluster DNS service. Egress to it must be allowed
+  # explicitly, otherwise default-deny egress silently breaks all name resolution.
+  dnsNamespace: kube-system
+
+# Spread replicas across nodes when possible. Deliberately ScheduleAnyway rather
+# than DoNotSchedule: on single-node minikube a hard constraint would leave every
+# replica after the first stuck Pending forever.
+topologySpread:
+  enabled: true
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []

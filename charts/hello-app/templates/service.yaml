@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hello-app.fullname" . }}
+  labels:
+    {{- include "hello-app.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      # Targeted by name, not number, so changing the container port in values
+      # cannot silently leave the Service pointing at nothing.
+      targetPort: http
+      protocol: TCP
+  selector:
+    {{- include "hello-app.selectorLabels" . | nindent 4 }}

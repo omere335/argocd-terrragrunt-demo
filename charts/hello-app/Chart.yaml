@@ -1,0 +1,10 @@
+apiVersion: v2
+name: hello-app
+description: Minimal Hello World web service, configured by Terraform/Terragrunt and delivered by ArgoCD.
+type: application
+# version  - the chart's own version. Bump on template changes.
+# appVersion - the upstream app version. Informational only; the deployed image
+#              is pinned by digest in the Terraform-generated values overlay
+#              (envs/<env>/app/values.generated.yaml), not by this field.
+version: 0.1.0
+appVersion: "1.0"

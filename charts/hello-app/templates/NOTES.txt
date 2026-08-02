@@ -1,0 +1,19 @@
+{{ .Chart.Name }} {{ .Chart.Version }} deployed as {{ include "hello-app.fullname" . }} in namespace {{ .Release.Namespace }}.
+
+Reach it:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "hello-app.fullname" . }} 8080:{{ .Values.service.port }}
+  curl http://localhost:8080/
+
+Expected response: {{ .Values.app.text }}
+
+Health endpoint (used by all three probes):
+
+  curl http://localhost:8080/health   # {"status":"ok"}
+
+{{- if .Values.networkPolicy.enabled }}
+
+A default-deny NetworkPolicy is active. It is only enforced if the cluster runs a
+CNI that implements NetworkPolicy - on minikube, start with --cni=calico.
+Verify with scripts/verify.sh.
+{{- end }}
