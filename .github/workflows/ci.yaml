@@ -41,7 +41,7 @@ jobs:
           set -euo pipefail
           curl -fsSL -o tf.zip \
             "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
-          unzip -q tf.zip -d /usr/local/bin
+          unzip -q -o tf.zip -d /usr/local/bin
           curl -fsSL -o /usr/local/bin/terragrunt \
             "https://github.com/gruntwork-io/terragrunt/releases/download/v${TERRAGRUNT_VERSION}/terragrunt_linux_amd64"
           chmod +x /usr/local/bin/terragrunt
